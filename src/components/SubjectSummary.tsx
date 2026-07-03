@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { db, handleFirestoreError, OperationType } from "../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
 import { SUBJECTS, STUDENTS } from "../data";
 import { Registration, SubjectStats } from "../types";
 import { BarChart, Users, BookOpen, ChevronRight, ChevronDown, Award } from "lucide-react";
@@ -13,22 +11,29 @@ export default function SubjectSummary() {
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = collection(db, "registrations");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data: Registration[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Registration);
-      });
-      setRegistrations(data);
-      calculateStats(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching registrations in real-time:", error);
-      setLoading(false);
-      handleFirestoreError(error, OperationType.GET, "registrations");
-    });
+    const fetchRegistrations = async () => {
+      try {
+        const response = await fetch("/api/registrations");
+        if (response.ok) {
+          const data = await response.json() as Registration[];
+          setRegistrations(data);
+          calculateStats(data);
+        } else {
+          throw new Error("Failed to fetch registrations");
+        }
+      } catch (error) {
+        console.error("Error fetching registrations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchRegistrations();
+
+    // Set up polling to check for updates every 5 seconds
+    const interval = setInterval(fetchRegistrations, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const calculateStats = (data: Registration[]) => {

@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { db, handleFirestoreError, OperationType } from "../firebase";
-import { collection, doc, setDoc, getDoc, query, onSnapshot, getDocs } from "firebase/firestore";
 import { STUDENTS, SUBJECTS } from "../data";
 import { Registration } from "../types";
 import { motion, AnimatePresence } from "motion/react";
@@ -34,22 +32,24 @@ export default function StudentSurvey() {
     const checkRegistration = async () => {
       setLoadingHistory(true);
       try {
-        const docRef = doc(db, "registrations", selectedStudent);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data() as Registration;
-          setExistingRegistration(data);
-          setSelectedSubjects(data.selectedSubjects);
-          setHasPreviousRegistration(true);
+        const response = await fetch("/api/registrations");
+        if (response.ok) {
+          const allRegistrations = await response.json() as Registration[];
+          const studentReg = allRegistrations.find(r => r.studentName === selectedStudent);
+          if (studentReg) {
+            setExistingRegistration(studentReg);
+            setSelectedSubjects(studentReg.selectedSubjects);
+            setHasPreviousRegistration(true);
+          } else {
+            setSelectedSubjects([]);
+            setHasPreviousRegistration(false);
+            setExistingRegistration(null);
+          }
         } else {
-          setSelectedSubjects([]);
-          setHasPreviousRegistration(false);
-          setExistingRegistration(null);
+          throw new Error("Failed to fetch registrations");
         }
       } catch (err) {
         console.error("Error fetching registration history:", err);
-        handleFirestoreError(err, OperationType.GET, `registrations/${selectedStudent}`);
       } finally {
         setLoadingHistory(false);
       }
@@ -90,8 +90,17 @@ export default function StudentSurvey() {
         updatedAt: hasPreviousRegistration ? new Date().toISOString() : undefined
       };
 
-      // Save directly with student's name as document ID to avoid duplicates and ensure easy lookup
-      await setDoc(doc(db, "registrations", selectedStudent), registrationData);
+      const response = await fetch("/api/registrations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(registrationData)
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save registration");
+      }
       
       setSubmitSuccess(true);
       setTimeout(() => {
@@ -103,7 +112,6 @@ export default function StudentSurvey() {
     } catch (err) {
       console.error("Error saving registration:", err);
       alert("Có lỗi xảy ra khi lưu dữ liệu. Vui lòng thử lại!");
-      handleFirestoreError(err, OperationType.WRITE, `registrations/${selectedStudent}`);
     } finally {
       setIsSubmitting(false);
     }

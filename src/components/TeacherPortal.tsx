@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { db, handleFirestoreError, OperationType } from "../firebase";
-import { collection, onSnapshot, getDocs } from "firebase/firestore";
 import { STUDENTS, SUBJECTS } from "../data";
 import { Registration, SubjectStats } from "../types";
 import { LogIn, LogOut, Download, FileSpreadsheet, CheckCircle, AlertTriangle, Search, Filter } from "lucide-react";
@@ -26,28 +24,37 @@ export default function TeacherPortal() {
     const savedSession = localStorage.getItem("teacher_session");
     if (savedSession === TEACHER_EMAIL) {
       setIsLoggedIn(true);
-      fetchRegistrations();
     }
   }, []);
 
-  const fetchRegistrations = () => {
-    setLoading(true);
-    const q = collection(db, "registrations");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data: Registration[] = [];
-      snapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Registration);
-      });
-      setRegistrations(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching registrations for teacher:", error);
-      setLoading(false);
-      handleFirestoreError(error, OperationType.GET, "registrations");
-    });
+  // Fetch registrations automatically when logged in
+  useEffect(() => {
+    if (!isLoggedIn) return;
 
-    return unsubscribe;
-  };
+    setLoading(true);
+    const fetchRegs = async () => {
+      try {
+        const response = await fetch("/api/registrations");
+        if (response.ok) {
+          const data = await response.json() as Registration[];
+          setRegistrations(data);
+        } else {
+          throw new Error("Failed to fetch registrations");
+        }
+      } catch (error) {
+        console.error("Error fetching registrations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRegs();
+
+    // Set up polling to check for updates every 5 seconds
+    const interval = setInterval(fetchRegs, 5000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,13 +66,12 @@ export default function TeacherPortal() {
     }
 
     if (password !== DEFAULT_PASSWORD) {
-      setLoginError("Mật khẩu không chính xác. Mật khẩu mặc định là: 10A7SongNgu");
+      setLoginError("Mật khẩu không chính xác.");
       return;
     }
 
     setIsLoggedIn(true);
     localStorage.setItem("teacher_session", TEACHER_EMAIL);
-    fetchRegistrations();
   };
 
   const handleLogout = () => {
