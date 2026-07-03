@@ -91,12 +91,15 @@ app.post("/api/registrations", async (req, res) => {
   const registrations = readLocalRegistrations();
   const existingIndex = registrations.findIndex(r => r.studentName === studentName);
 
-  const registrationData = {
+  const registrationData: any = {
     studentName,
     selectedSubjects: selectedSubjects || [],
-    timestamp,
-    updatedAt
+    timestamp
   };
+
+  if (updatedAt !== undefined) {
+    registrationData.updatedAt = updatedAt;
+  }
 
   if (existingIndex >= 0) {
     registrations[existingIndex] = registrationData;
