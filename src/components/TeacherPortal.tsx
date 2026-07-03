@@ -4,6 +4,8 @@ import { Registration, SubjectStats } from "../types";
 import { LogIn, LogOut, Download, FileSpreadsheet, CheckCircle, AlertTriangle, Search, Filter } from "lucide-react";
 import * as XLSX from "xlsx";
 import { motion } from "motion/react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db, handleFirestoreError, OperationType } from "../firebase";
 
 export default function TeacherPortal() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -32,28 +34,21 @@ export default function TeacherPortal() {
     if (!isLoggedIn) return;
 
     setLoading(true);
-    const fetchRegs = async () => {
-      try {
-        const response = await fetch("/api/registrations");
-        if (response.ok) {
-          const data = await response.json() as Registration[];
-          setRegistrations(data);
-        } else {
-          throw new Error("Failed to fetch registrations");
-        }
-      } catch (error) {
-        console.error("Error fetching registrations:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const q = collection(db, "registrations");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data: Registration[] = [];
+      snapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() } as Registration);
+      });
+      setRegistrations(data);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching registrations for teacher:", error);
+      setLoading(false);
+      handleFirestoreError(error, OperationType.GET, "registrations");
+    });
 
-    fetchRegs();
-
-    // Set up polling to check for updates every 5 seconds
-    const interval = setInterval(fetchRegs, 5000);
-
-    return () => clearInterval(interval);
+    return unsubscribe;
   }, [isLoggedIn]);
 
   const handleLogin = (e: React.FormEvent) => {

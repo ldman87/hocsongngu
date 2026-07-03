@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
@@ -14,9 +14,12 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with the specific database ID if needed
-// The firestoreDatabaseId from firebase-applet-config.json is "ai-studio-8d2b9b2a-cce2-43f8-985a-681b713028a0"
-export const db = getFirestore(app, "ai-studio-8d2b9b2a-cce2-43f8-985a-681b713028a0");
+// Initialize Firestore with specific options for iframe compatibility (long polling & memory cache)
+export const db = initializeFirestore(app, {
+  localCache: memoryLocalCache(),
+  experimentalForceLongPolling: true
+}, "ai-studio-8d2b9b2a-cce2-43f8-985a-681b713028a0");
+
 export const auth = getAuth(app);
 
 export enum OperationType {

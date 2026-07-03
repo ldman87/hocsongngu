@@ -3,6 +3,8 @@ import { STUDENTS, SUBJECTS } from "../data";
 import { Registration } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, AlertCircle, Sparkles, BookOpen, User, CheckSquare, Square, RefreshCw } from "lucide-react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db, handleFirestoreError, OperationType } from "../firebase";
 
 export default function StudentSurvey() {
   const [selectedStudent, setSelectedStudent] = useState<string>("");
@@ -32,21 +34,17 @@ export default function StudentSurvey() {
     const checkRegistration = async () => {
       setLoadingHistory(true);
       try {
-        const response = await fetch("/api/registrations");
-        if (response.ok) {
-          const allRegistrations = await response.json() as Registration[];
-          const studentReg = allRegistrations.find(r => r.studentName === selectedStudent);
-          if (studentReg) {
-            setExistingRegistration(studentReg);
-            setSelectedSubjects(studentReg.selectedSubjects);
-            setHasPreviousRegistration(true);
-          } else {
-            setSelectedSubjects([]);
-            setHasPreviousRegistration(false);
-            setExistingRegistration(null);
-          }
+        const docRef = doc(db, "registrations", selectedStudent);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const studentReg = docSnap.data() as Registration;
+          setExistingRegistration(studentReg);
+          setSelectedSubjects(studentReg.selectedSubjects || []);
+          setHasPreviousRegistration(true);
         } else {
-          throw new Error("Failed to fetch registrations");
+          setSelectedSubjects([]);
+          setHasPreviousRegistration(false);
+          setExistingRegistration(null);
         }
       } catch (err) {
         console.error("Error fetching registration history:", err);
@@ -83,24 +81,18 @@ export default function StudentSurvey() {
 
     setIsSubmitting(true);
     try {
-      const registrationData: Registration = {
+      const registrationData: any = {
         studentName: selectedStudent,
         selectedSubjects: selectedSubjects,
-        timestamp: new Date().toISOString(),
-        updatedAt: hasPreviousRegistration ? new Date().toISOString() : undefined
+        timestamp: new Date().toISOString()
       };
 
-      const response = await fetch("/api/registrations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(registrationData)
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save registration");
+      if (hasPreviousRegistration) {
+        registrationData.updatedAt = new Date().toISOString();
       }
+
+      const docRef = doc(db, "registrations", selectedStudent);
+      await setDoc(docRef, registrationData);
       
       setSubmitSuccess(true);
       setTimeout(() => {
