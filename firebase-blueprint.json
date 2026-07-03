@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "Registration": {
+      "title": "Registration",
+      "description": "Student survey registration for bilingual classes",
+      "type": "object",
+      "properties": {
+        "studentName": {
+          "type": "string",
+          "description": "The exact full name of the student from class 10A7"
+        },
+        "selectedSubjects": {
+          "type": "array",
+          "description": "An array of selected bilingual subjects"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 string of when the registration was submitted"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 string of when the registration was last updated (optional)"
+        }
+      },
+      "required": [
+        "studentName",
+        "selectedSubjects",
+        "timestamp"
+      ]
+    }
+  },
+  "firestore": {
+    "/registrations/{studentName}": {
+      "schema": "Registration",
+      "description": "Survey response for a specific student, identified by their unique name"
+    }
+  }
+}

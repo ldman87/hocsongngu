@@ -1,0 +1,6 @@
+{
+  "name": "Khảo sát Học Song ngữ lớp 10A7",
+  "description": "Ứng dụng khảo sát lựa chọn môn học Song ngữ của học sinh lớp 10A7, hỗ trợ tổng hợp và xuất dữ liệu báo cáo cho Giáo viên chủ nhiệm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
