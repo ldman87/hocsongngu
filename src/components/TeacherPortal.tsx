@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { STUDENTS, SUBJECTS } from "../data";
 import { Registration, SubjectStats } from "../types";
-import { LogIn, LogOut, Download, FileSpreadsheet, CheckCircle, AlertTriangle, Search, Filter } from "lucide-react";
+import { LogIn, LogOut, Download, FileSpreadsheet, CheckCircle, AlertTriangle, Search, Filter, Copy, Check } from "lucide-react";
 import * as XLSX from "xlsx";
 import { motion } from "motion/react";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -16,6 +16,7 @@ export default function TeacherPortal() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all"); // all, submitted, pending
+  const [copied, setCopied] = useState<boolean>(false);
 
   // Default teacher credentials
   const TEACHER_EMAIL = "ldman87@gmail.com";
@@ -40,7 +41,9 @@ export default function TeacherPortal() {
       snapshot.forEach((doc) => {
         data.push({ id: doc.id, ...doc.data() } as Registration);
       });
-      setRegistrations(data);
+      // Filter out registrations of students who are not in the class STUDENTS list
+      const validData = data.filter((r) => r.studentName && STUDENTS.includes(r.studentName));
+      setRegistrations(validData);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching registrations for teacher:", error);
@@ -150,6 +153,30 @@ export default function TeacherPortal() {
     XLSX.writeFile(workbook, "Ket_Qua_Khao_Sat_Song_Ngu_10A7.xlsx");
   };
 
+  const handleCopyTable = () => {
+    // Headers
+    let text = "STT\tHọ và Tên Học Sinh\tTrạng Thái Đăng Ký\tDanh Sách Môn Học Đăng Ký\tThời Gian Khảo Sát\n";
+    fullClassData.forEach((s, idx) => {
+      text += `${idx + 1}\t${s.studentName}\t${s.isRegistered ? "Đã xác nhận" : "Chưa khảo sát"}\t${s.isRegistered ? s.selectedSubjects.join(", ") : "N/A"}\t${s.timestamp}\n`;
+    });
+    
+    // Add summary
+    text += "\n\nTỔNG HỢP THEO MÔN HỌC\n";
+    text += "Môn Học\tSố Lượng Đăng Ký\tTỉ Lệ (%)\tDanh Sách Học Sinh\n";
+    const summaryStats = calculateSubjectStats();
+    summaryStats.forEach((row) => {
+      text += `${row["Môn Học"]}\t${row["Số Lượng Đăng Ký"]}\t${row["Tỉ Lệ (%)"]}\t${row["Danh Sách Học Sinh"]}\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }).catch(err => {
+      console.error("Failed to copy table: ", err);
+      alert("Không thể sao chép tự động. Vui lòng thử lại!");
+    });
+  };
+
   const submittedCount = registrations.length;
   const pendingCount = STUDENTS.length - submittedCount;
 
@@ -237,7 +264,7 @@ export default function TeacherPortal() {
         /* Teacher Dashboard View */
         <div className="space-y-6">
           {/* Quick Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-xl flex items-center justify-between">
               <div>
                 <span className="text-xs text-slate-500 font-semibold block">Đã hoàn thành khảo sát</span>
@@ -267,6 +294,35 @@ export default function TeacherPortal() {
                 Tải báo cáo về máy
               </span>
             </button>
+
+            <button
+              onClick={handleCopyTable}
+              className={`${
+                copied ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 hover:shadow-indigo-600/25"
+              } text-white p-4 rounded-xl shadow-lg transition-all flex flex-col justify-center items-start text-left relative overflow-hidden group cursor-pointer`}
+            >
+              <div className="absolute right-3 bottom-2 text-indigo-500 opacity-20 group-hover:scale-110 transition-transform">
+                <Copy className="w-16 h-16" />
+              </div>
+              <span className="text-xs text-indigo-100 font-semibold block">
+                {copied ? "Thành công!" : "Hỗ trợ mobile / Zalo"}
+              </span>
+              <span className="text-base font-bold flex items-center gap-1.5 mt-1">
+                {copied ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4" />}
+                {copied ? "Đã lưu bộ nhớ tạm" : "Copy bảng dữ liệu"}
+              </span>
+            </button>
+          </div>
+
+          {/* Advice Banner if on Zalo or Mobile */}
+          <div className="bg-blue-50 border border-blue-100 p-3.5 rounded-xl flex gap-2 items-start text-xs text-blue-800 leading-relaxed">
+            <svg className="w-4.5 h-4.5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <span className="font-semibold block text-blue-950">Mẹo dành cho Giáo viên:</span>
+              Nếu bấm nút <strong className="font-semibold text-blue-900">"Tải báo cáo về máy"</strong> trên điện thoại (đặc biệt là khi mở từ tin nhắn Zalo) không hoạt động do cơ chế chặn tải file của ứng dụng, thầy cô vui lòng bấm nút <strong className="font-semibold text-indigo-900">"Copy bảng dữ liệu"</strong>, sau đó mở ứng dụng Google Trang tính (Google Sheets) hoặc Excel trên điện thoại và bấm <strong className="font-semibold text-indigo-900">Dán (Paste)</strong> để nhận toàn bộ kết quả khảo sát ngay lập tức!
+            </div>
           </div>
 
           {/* Search and Filters */}

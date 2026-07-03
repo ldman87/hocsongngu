@@ -3,6 +3,8 @@ import { SUBJECTS, STUDENTS } from "../data";
 import { Registration, SubjectStats } from "../types";
 import { BarChart, Users, BookOpen, ChevronRight, ChevronDown, Award } from "lucide-react";
 import { motion } from "motion/react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 
 export default function SubjectSummary() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -11,29 +13,24 @@ export default function SubjectSummary() {
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchRegistrations = async () => {
-      try {
-        const response = await fetch("/api/registrations");
-        if (response.ok) {
-          const data = await response.json() as Registration[];
-          setRegistrations(data);
-          calculateStats(data);
-        } else {
-          throw new Error("Failed to fetch registrations");
-        }
-      } catch (error) {
-        console.error("Error fetching registrations:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    setLoading(true);
+    const q = collection(db, "registrations");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data: Registration[] = [];
+      snapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() } as Registration);
+      });
+      // Filter out registrations of students who are not in the class STUDENTS list
+      const validData = data.filter((r) => r.studentName && STUDENTS.includes(r.studentName));
+      setRegistrations(validData);
+      calculateStats(validData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching registrations for summary:", error);
+      setLoading(false);
+    });
 
-    fetchRegistrations();
-
-    // Set up polling to check for updates every 5 seconds
-    const interval = setInterval(fetchRegistrations, 5000);
-
-    return () => clearInterval(interval);
+    return unsubscribe;
   }, []);
 
   const calculateStats = (data: Registration[]) => {
